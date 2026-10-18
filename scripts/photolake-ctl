@@ -1,0 +1,291 @@
+#!/usr/bin/env bash
+# photolake-ctl: start, stop, update and configure a container install of Photolake.
+# Run `photolake-ctl help` for the commands.
+set -euo pipefail
+
+# ---------- locate the install ----------
+CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/photolake"
+if [ -z "${PHOTOLAKE_HOME:-}" ]; then
+  if [ -f "$CONF_DIR/home" ]; then
+    PHOTOLAKE_HOME="$(cat "$CONF_DIR/home")"
+  else
+    PHOTOLAKE_HOME="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+  fi
+fi
+cd "$PHOTOLAKE_HOME" 2>/dev/null || { echo "Photolake folder $PHOTOLAKE_HOME not found." >&2; exit 1; }
+[ -f docker-compose.yml ] || { echo "No docker-compose.yml in $PHOTOLAKE_HOME." >&2; exit 1; }
+[ -f .env ] || { echo "No .env in $PHOTOLAKE_HOME (run the installer first)." >&2; exit 1; }
+
+bold() { printf '\033[1m%s\033[0m\n' "$*"; }
+info() { printf '  %s\n' "$*"; }
+warn() { printf '\033[33m%s\033[0m\n' "$*" >&2; }
+die() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
+
+env_get() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- || true; }
+env_set() {
+  local key="$1" value="$2"
+  if grep -qE "^$key=" .env; then
+    local tmp; tmp="$(mktemp)"
+    awk -v k="$key" -v v="$value" 'BEGIN{FS=OFS="="} $1==k {print k "=" v; next} {print}' .env > "$tmp"
+    cat "$tmp" > .env && rm -f "$tmp"
+  else
+    printf '%s=%s\n' "$key" "$value" >> .env
+  fi
+}
+
+compose() {
+  local files=(-f docker-compose.yml)
+  [ "$(env_get PHOTOLAKE_GPU)" = "1" ] && files+=(-f compose.gpu.yml)
+  local profiles=()
+  [ "$(env_get PHOTOLAKE_TAILSCALE)" = "1" ] && profiles+=(--profile tailscale)
+  docker compose "${files[@]}" "${profiles[@]}" "$@"
+}
+
+port() { local p; p="$(env_get PHOTOLAKE_PORT)"; echo "${p:-7878}"; }
+local_url() { echo "http://localhost:$(port)"; }
+lan_ip() { ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1; }
+
+healthy() {
+  curl -fsS -o /dev/null --max-time 3 "$(local_url)/api/auth/me" 2>/dev/null
+}
+
+wait_healthy() {
+  local secs="${1:-180}"
+  printf '  waiting for Photolake to start'
+  for _ in $(seq 1 "$secs"); do
+    if healthy; then echo " ready."; return 0; fi
+    printf '.'; sleep 1
+  done
+  echo; return 1
+}
+
+cli() { compose exec -T photolake /opt/photolake/photolake "$@"; }
+
+# ---------- commands ----------
+cmd_start() {
+  bold "Starting Photolake"
+  compose up -d --remove-orphans
+  wait_healthy 180 || die "Photolake didn't come up. See: photolake-ctl logs"
+  cmd_urls
+}
+
+cmd_stop() {
+  bold "Stopping Photolake"
+  compose stop
+  info "Stopped. It stays off (also after a reboot) until: photolake-ctl start"
+}
+
+cmd_restart() { compose restart photolake; wait_healthy 120 || die "See: photolake-ctl logs"; }
+
+cmd_status() {
+  compose ps
+  echo
+  if healthy; then bold "Photolake is running"; cmd_urls; else bold "Photolake is not answering"; fi
+  info "Autostart at boot: $([ "$(env_get PHOTOLAKE_RESTART)" = "no" ] && echo off || echo on)"
+  info "GPU: $([ "$(env_get PHOTOLAKE_GPU)" = "1" ] && echo on || echo off)"
+}
+
+cmd_urls() {
+  info "This computer:  $(local_url)"
+  if [ "$(env_get PHOTOLAKE_LISTEN)" = "0.0.0.0" ]; then
+    local ip; ip="$(lan_ip)"; [ -n "$ip" ] && info "Home Wi-Fi:     http://$ip:$(port)"
+  fi
+  if [ "$(env_get PHOTOLAKE_TAILSCALE)" = "1" ]; then
+    local name; name="$(compose exec -T tailscale tailscale status --json 2>/dev/null | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1 || true)"
+    [ -n "$name" ] && info "Anywhere (Tailscale): https://$name"
+  fi
+}
+
+cmd_logs() { compose logs --tail=200 "${@:--f}"; }
+
+cmd_open() { xdg-open "$(local_url)" >/dev/null 2>&1 || info "Open $(local_url) in your browser."; }
+
+cmd_autostart() {
+  case "${1:-}" in
+    on|enable) env_set PHOTOLAKE_RESTART unless-stopped ;;
+    off|disable) env_set PHOTOLAKE_RESTART no ;;
+    *) die "usage: photolake-ctl autostart on|off" ;;
+  esac
+  compose up -d --no-recreate >/dev/null 2>&1 || true
+  # Restart policy changes need a recreate; data is untouched.
+  compose up -d --force-recreate photolake rustfs
+  info "Autostart at boot is now ${1}."
+}
+
+cmd_models() {
+  bold "Installing bird models (first time downloads ~1.4 GB)"
+  compose --profile models pull models
+  compose --profile models run --rm models
+}
+
+image_id() { docker image inspect --format '{{.Id}}' "$1" 2>/dev/null || true; }
+current_image() {
+  local tag; tag="$(env_get PHOTOLAKE_IMAGE):$(env_get PHOTOLAKE_TAG)"
+  [ "$(env_get PHOTOLAKE_GPU)" = "1" ] && tag="$tag-cuda"
+  echo "$tag"
+}
+
+cmd_update() {
+  bold "Updating Photolake"
+  local img prev started
+  img="$(current_image)"
+  prev="$(image_id "$img")"
+  started="$(date +%s)"
+  [ -n "$prev" ] && docker tag "$prev" "${img%%:*}:rollback"
+  info "Your photos and library stay where they are; only the app is replaced."
+  if [[ "$(env_get PHOTOLAKE_IMAGE)" == */* ]]; then
+    compose pull photolake rustfs
+    cmd_models || warn "Model update skipped."
+  else
+    info "Built from source: rebuilding from $(compose config --format json 2>/dev/null | sed -n 's/.*"context": *"\([^"]*\)".*/\1/p' | head -1)"
+    compose build photolake
+  fi
+  compose up -d --remove-orphans
+  if wait_healthy 300; then
+    bold "Updated."
+    cli version || true
+    return 0
+  fi
+  warn "The new version did not start. Going back to the previous one..."
+  compose logs --tail=40 photolake >&2 || true
+  [ -n "$prev" ] || die "No previous version to return to."
+  rollback_to "$prev" "$started"
+}
+
+# Return to the image `$1`; if the failed version upgraded the library after `$2`, restore
+# the catalog snapshot it took first.
+rollback_to() {
+  local prev="$1" since="${2:-0}" img snap
+  img="$(current_image)"
+  docker tag "$prev" "$img"
+  snap="$(ls -t "$(env_get PHOTOLAKE_DATA)"/pre-upgrade/*.db 2>/dev/null | head -1 || true)"
+  if [ -n "$snap" ] && [ "$(stat -c %Y "$snap")" -ge "$since" ]; then
+    info "Restoring the library catalog from before the upgrade ($(basename "$snap"))"
+    compose stop photolake
+    compose run --rm --no-deps photolake rollback "/data/pre-upgrade/$(basename "$snap")"
+  fi
+  compose up -d --no-build photolake
+  wait_healthy 180 && bold "Back on the previous version." || die "Still not starting; see photolake-ctl logs."
+}
+
+cmd_rollback() {
+  local img prev
+  img="$(current_image)"
+  prev="$(image_id "${img%%:*}:rollback")"
+  [ -n "$prev" ] || die "No previous version saved (updates save one automatically)."
+  rollback_to "$prev" "${1:-0}"
+}
+
+cmd_backup() { bold "Backing up"; cli backup "$@"; }
+
+cmd_passwd() {
+  local flag="${1:-}"
+  compose exec photolake /opt/photolake/photolake passwd ${flag:+"$flag"}
+  compose restart photolake >/dev/null && wait_healthy 120 >/dev/null || true
+  info "Saved. Devices will need to sign in again."
+}
+
+cmd_wifi() {
+  case "${1:-}" in
+    on)
+      env_set PHOTOLAKE_LISTEN 0.0.0.0
+      compose up -d photolake
+      wait_healthy 120 || die "See: photolake-ctl logs"
+      local ip; ip="$(lan_ip)"
+      bold "Home Wi-Fi access is on: http://${ip:-THIS-COMPUTERS-IP}:$(port)"
+      info "Sign in with your Photolake password. Traffic on your Wi-Fi is not encrypted;"
+      info "for encrypted access (and access away from home) use: photolake-ctl tailscale on"
+      ;;
+    off)
+      env_set PHOTOLAKE_LISTEN 127.0.0.1
+      compose up -d photolake
+      bold "Home Wi-Fi access is off (only this computer can open Photolake)."
+      ;;
+    *) die "usage: photolake-ctl wifi on|off" ;;
+  esac
+}
+
+cmd_tailscale() {
+  case "${1:-}" in
+    on)
+      if [ -z "$(env_get TS_AUTHKEY)" ]; then
+        echo "Create an auth key at https://login.tailscale.com/admin/settings/keys"
+        echo "(and turn on MagicDNS + HTTPS Certificates at https://login.tailscale.com/admin/dns)."
+        read -r -s -p "Paste the auth key (tskey-...): " key; echo
+        [ -n "$key" ] || die "No key given."
+        env_set TS_AUTHKEY "$key"
+      fi
+      env_set PHOTOLAKE_TAILSCALE 1
+      compose up -d tailscale
+      sleep 8
+      bold "Tailscale access is on."
+      cmd_urls
+      info "Install the Tailscale app on your phone, sign in with the same account, then open that address."
+      ;;
+    off)
+      compose stop tailscale >/dev/null 2>&1 || true
+      env_set PHOTOLAKE_TAILSCALE 0
+      bold "Tailscale access is off."
+      ;;
+    *) die "usage: photolake-ctl tailscale on|off" ;;
+  esac
+}
+
+cmd_uninstall() {
+  bold "Removing the Photolake containers"
+  compose --profile models --profile tailscale down --remove-orphans
+  rm -f "$HOME/.local/bin/photolake-ctl" "$HOME/.local/share/applications/photolake.desktop"
+  if [ "${1:-}" = "--delete-data" ]; then
+    warn "This permanently deletes your library in $PHOTOLAKE_HOME (photos included)."
+    read -r -p "Type DELETE to confirm: " ok
+    [ "$ok" = "DELETE" ] && rm -rf "$PHOTOLAKE_HOME" && info "Deleted." || info "Kept your data."
+  else
+    info "Your photos and library are still in $PHOTOLAKE_HOME."
+    info "Reinstall any time with the installer; it will pick them up again."
+  fi
+}
+
+cmd_help() {
+  cat <<EOF
+Photolake control (install folder: $PHOTOLAKE_HOME)
+
+  start              Turn Photolake on
+  stop               Turn Photolake off (stays off after reboots until 'start')
+  restart            Restart the app
+  status             Is it running? Addresses to open it
+  open               Open it in your browser
+  logs               Follow the logs (Ctrl+C to stop following)
+
+  update             Install the newest version (keeps your library; reverts on failure)
+  rollback           Go back to the version before the last update
+  backup             Back up now to every connected backup target
+  passwd [--viewer]  Change the password (--viewer: the read-only password)
+
+  wifi on|off        Let phones/computers on your home network connect
+  tailscale on|off   Private, encrypted access from anywhere via Tailscale
+  autostart on|off   Start automatically when the computer boots
+
+  uninstall [--delete-data]   Remove the app (keeps your photos unless --delete-data)
+EOF
+}
+
+case "${1:-help}" in
+  start) cmd_start ;;
+  stop) cmd_stop ;;
+  restart) cmd_restart ;;
+  status) cmd_status ;;
+  open) cmd_open ;;
+  logs) shift; cmd_logs "$@" ;;
+  update) cmd_update ;;
+  rollback) shift; cmd_rollback "$@" ;;
+  backup) shift; cmd_backup "$@" ;;
+  passwd) shift; cmd_passwd "$@" ;;
+  wifi) shift; cmd_wifi "$@" ;;
+  tailscale) shift; cmd_tailscale "$@" ;;
+  autostart) shift; cmd_autostart "$@" ;;
+  models) cmd_models ;;
+  urls) cmd_urls ;;
+  uninstall) shift; cmd_uninstall "$@" ;;
+  help|-h|--help) cmd_help ;;
+  *) cmd_help; exit 1 ;;
+esac

@@ -1,0 +1,68 @@
+# Photolake configuration. Copy to ~/.config/photolake/config.toml (or run `photolake init`).
+# Every setting is optional; the values shown are the defaults. Most can also be changed
+# from the Settings page in the UI.
+
+# Local state: Iceberg SQL catalog (catalog.db), caches, backup status.
+# data_dir = "~/.local/share/photolake"
+
+[storage]
+# Any S3-compatible store: the bundled RustFS/MinIO, AWS S3, Backblaze B2, Cloudflare R2...
+endpoint = "http://127.0.0.1:9000"
+region = "us-east-1"
+access_key = "photolake"
+secret_key = "photolake-secret"
+photos_bucket = "photos"        # originals, previews, thumbnails
+warehouse_bucket = "warehouse"  # Iceberg tables
+
+[server]
+bind = "127.0.0.1:7878"         # 0.0.0.0:7878 reaches other devices on your LAN (needs a password)
+# allowed_hosts = ["photos.home.arpa"]   # extra host names (IPs, localhost and *.ts.net always work)
+
+[server.auth]
+# Set with `photolake passwd` (or Settings → Sign-in). Never put a plain password here.
+# admin_password_hash = "$argon2id$..."
+# viewer_password_hash = "$argon2id$..."   # optional read-only login
+session_days = 30
+
+[import]
+auto_import = true              # import when a card with a DCIM folder is mounted
+# camera_timezone = "America/Denver"  # for cameras that don't record a UTC offset
+ignore_fs_uuids = []            # filesystems never imported from
+preview_px = 2048
+thumb_px = 480
+upload_concurrency = 8
+
+[ml]
+enabled = true
+# models_dir = "~/.local/share/photolake/models"   # written by tools/export_models.py
+detection_threshold = 0.4
+top_k = 3
+device = "auto"                 # auto = GPU when available, else CPU; or "cuda" / "cpu"
+tiling = true                   # re-scan bird-less photos in tiles to catch distant birds
+# ebird_api_key = "..."         # free: https://ebird.org/api/keygen — enables location re-ranking
+# home_region = "US-CO"         # eBird region for photos without GPS
+
+[backup]
+after_import = true
+daily_at = "02:30"              # local time; remove to disable
+
+# External drive, found by filesystem UUID wherever it mounts (see `photolake drives`).
+# [[backup.targets]]
+# name = "external-hdd"
+# kind = "local"
+# fs_uuid = "1234-ABCD"
+# path = "photolake-backup"     # folder on that drive
+
+# Any folder (NAS mount, second disk).
+# [[backup.targets]]
+# name = "nas"
+# kind = "local"
+# path = "/mnt/nas/photolake"
+
+# Cloud via rclone (B2, S3, R2, Google Drive, Dropbox, OneDrive, SFTP, ...). Set up the remote
+# once with `rclone config`.
+# [[backup.targets]]
+# name = "b2"
+# kind = "rclone"
+# remote = "b2:my-bucket/photolake"
+# enabled = false

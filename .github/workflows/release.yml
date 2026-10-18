@@ -1,0 +1,61 @@
+# Push a tag like v0.3.0 to publish:
+#   ghcr.io/<owner>/photolake:0.3.0, :0.3, :latest           (CPU)
+#   ghcr.io/<owner>/photolake:0.3.0-cuda, :0.3-cuda, :latest-cuda (NVIDIA GPU)
+# and a GitHub release with install.sh (pre-set to this repository).
+# Bird models are published separately by models.yml.
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        variant: [cpu, cuda]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/photolake
+          flavor: |
+            latest=true
+            suffix=${{ matrix.variant == 'cuda' && '-cuda' || '' }},onlatest=true
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime-${{ matrix.variant }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}
+
+  release:
+    needs: images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer pinned to this repository
+        run: |
+          sed 's#^REPO="${PHOTOLAKE_REPO:-}"#REPO="${PHOTOLAKE_REPO:-${{ github.repository }}}"#' scripts/install.sh > install.sh
+          grep -q '${{ github.repository }}' install.sh
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: install.sh
+          generate_release_notes: true

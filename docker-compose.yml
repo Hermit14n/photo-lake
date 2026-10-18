@@ -1,0 +1,93 @@
+# Photolake: everything runs in containers.
+#   photolake  - web UI, card watcher, bird ML, backups   (http://localhost:7878)
+#   rustfs     - S3 object storage holding photos + Iceberg tables (not exposed to the network)
+#   models     - one-shot (profile "models"): copies the bird models into the data folder;
+#                photolake-ctl runs it on install and update
+#   tailscale  - optional (profile "tailscale"): private HTTPS access from your phone, anywhere
+#
+# Settings come from .env (written by scripts/install.sh; see .env.example).
+# GPU: add `-f compose.gpu.yml` (photolake-ctl does this automatically when a GPU is present).
+name: photolake
+
+x-photolake-image: &photolake-image ${PHOTOLAKE_IMAGE:-photolake}:${PHOTOLAKE_TAG:-latest}
+
+services:
+  rustfs:
+    image: rustfs/rustfs:1.0.3
+    restart: ${PHOTOLAKE_RESTART:-unless-stopped}
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      RUSTFS_ACCESS_KEY: ${PHOTOLAKE_S3_ACCESS_KEY:-photolake}
+      RUSTFS_SECRET_KEY: ${PHOTOLAKE_S3_SECRET_KEY:-photolake-secret}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "false"
+    # No published ports by default: only the photolake container talks to storage.
+    # (Native development: `docker compose -f docker-compose.yml -f compose.dev.yml up -d rustfs`.)
+    volumes:
+      - ${PHOTOLAKE_S3_DATA:-./data/dev/s3}:/data
+      - ${PHOTOLAKE_S3_LOGS:-./data/dev/s3-logs}:/logs
+
+  models:
+    profiles: [models]
+    image: ${PHOTOLAKE_MODELS_IMAGE:-photolake-models}:${PHOTOLAKE_MODELS_TAG:-latest}
+    user: "${PUID:-1000}:${PGID:-1000}"
+    restart: "no"
+    volumes:
+      - ${PHOTOLAKE_DATA:-./data/dev/local}:/data
+
+  photolake:
+    image: *photolake-image
+    build:
+      context: ${PHOTOLAKE_SRC:-.}
+      target: runtime-cpu
+    restart: ${PHOTOLAKE_RESTART:-unless-stopped}
+    depends_on:
+      - rustfs
+    user: "${PUID:-1000}:${PGID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PHOTOLAKE_S3_ENDPOINT: http://rustfs:9000
+      PHOTOLAKE_S3_ACCESS_KEY: ${PHOTOLAKE_S3_ACCESS_KEY:-photolake}
+      PHOTOLAKE_S3_SECRET_KEY: ${PHOTOLAKE_S3_SECRET_KEY:-photolake-secret}
+      PHOTOLAKE_MOUNT_ROOTS: /media/${HOST_USER:-user}:/run/media/${HOST_USER:-user}:/media
+      PHOTOLAKE_IMPORT_ROOTS: /media:/import
+      PHOTOLAKE_ALLOWED_HOSTS: ${PHOTOLAKE_ALLOWED_HOSTS:-}
+      TZ: ${TZ:-UTC}
+      DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/${PUID:-1000}/bus
+    ports:
+      - "${PHOTOLAKE_LISTEN:-127.0.0.1}:${PHOTOLAKE_PORT:-7878}:7878"
+    volumes:
+      - ${PHOTOLAKE_DATA:-./data/dev/local}:/data
+      - ${PHOTOLAKE_CONFIG_DIR:-./data/dev/config}:/config
+      # Cameras, cards and backup drives appear here as you plug them in.
+      - type: bind
+        source: /media
+        target: /media
+        bind:
+          propagation: rslave
+      # Drive ids, so a backup drive is recognised wherever it mounts.
+      - /dev/disk:/dev/disk:ro
+      # A folder you can import from in the Imports page (read-only).
+      - ${PHOTOLAKE_IMPORT_DIR:-./data/dev/import}:/import:ro
+      # Desktop notifications ("Imported 214 photos, 37 with birds").
+      - /run/user/${PUID:-1000}/bus:/run/user/${PUID:-1000}/bus
+
+  tailscale:
+    profiles: [tailscale]
+    image: tailscale/tailscale:v1.102.3
+    hostname: ${PHOTOLAKE_TS_HOSTNAME:-photolake}
+    restart: ${PHOTOLAKE_RESTART:-unless-stopped}
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /serve.json
+    volumes:
+      - ${PHOTOLAKE_DATA:-./data/dev/local}/tailscale:/var/lib/tailscale
+      - ./docker/tailscale-serve.json:/serve.json:ro

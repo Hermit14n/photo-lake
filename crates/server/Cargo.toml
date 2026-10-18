@@ -1,0 +1,32 @@
+[package]
+name = "photolake-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+photolake-core.workspace = true
+photolake-lake.workspace = true
+photolake-ingest.workspace = true
+photolake-ml.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+futures.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+bytes.workspace = true
+datafusion.workspace = true
+axum = { version = "0.8", features = ["macros"] }
+tower-http = { version = "0.6", features = ["fs", "compression-gzip", "trace"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+photolake-backup.workspace = true
+notify-rust = "4"
+chrono-tz = "0.10"
+argon2 = "0.5"
+getrandom = "0.3"
+sha2 = "0.11"
+hex = "0.4"

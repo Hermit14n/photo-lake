@@ -1,0 +1,30 @@
+[package]
+name = "photolake-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "photolake"
+path = "src/main.rs"
+
+[dependencies]
+photolake-core.workspace = true
+photolake-lake.workspace = true
+photolake-ingest.workspace = true
+photolake-ml.workspace = true
+photolake-server.workspace = true
+photolake-backup.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde_json.workspace = true
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+clap = { version = "4", features = ["derive"] }
+rpassword = "7"
+
+[features]
+# GPU build: also enable it in the ML crate.
+cuda = ["photolake-ml/cuda"]

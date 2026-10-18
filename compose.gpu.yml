@@ -1,0 +1,17 @@
+# NVIDIA GPU overlay: docker compose -f docker-compose.yml -f compose.gpu.yml up -d
+# Needs the NVIDIA driver (>= 525) and nvidia-container-toolkit on the host.
+services:
+  photolake:
+    image: ${PHOTOLAKE_IMAGE:-photolake}:${PHOTOLAKE_TAG:-latest}-cuda
+    build:
+      context: ${PHOTOLAKE_SRC:-.}
+      target: runtime-cuda
+    environment:
+      PHOTOLAKE_ML_DEVICE: auto
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

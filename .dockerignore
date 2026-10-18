@@ -1,0 +1,10 @@
+target/
+data/
+.ort/
+.git/
+web/node_modules/
+web/dist/
+tools/.venv/
+**/*.db
+config.toml
+.env

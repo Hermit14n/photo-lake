@@ -1,0 +1,33 @@
+[package]
+name = "photolake-ingest"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+photolake-core.workspace = true
+photolake-lake.workspace = true
+photolake-ml.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+futures.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+bytes.workspace = true
+nom-exif = "3.8"
+rawler = "0.8"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "tiff", "webp"] }
+fast_image_resize = { version = "6", features = ["image"] }
+reverse_geocoder = "4"
+walkdir = "2"
+sha2 = "0.11"
+hex = "0.4"
+chrono-tz = "0.10"
+quick-xml = "0.42"
+
+[dev-dependencies]
+tempfile = "3"

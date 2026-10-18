@@ -1,0 +1,24 @@
+[package]
+name = "photolake-ml"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+photolake-core.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+ort = { version = "=2.0.0-rc.14", features = ["ndarray"] }
+ndarray = "0.17"
+fast_image_resize = { version = "6", features = ["image"] }
+reqwest = { workspace = true, features = ["json", "blocking"] }
+
+[features]
+# GPU builds load ONNX Runtime at run time (Microsoft's CUDA 12 build, fetched by
+# scripts/fetch-onnxruntime-gpu.sh) instead of linking the CPU-only one.
+cuda = ["ort/cuda", "ort/load-dynamic"]

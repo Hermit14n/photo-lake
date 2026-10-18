@@ -1,0 +1,12 @@
+# cargo-audit exceptions. Each entry needs a reason; revisit when the pinned crates move.
+[advisories]
+ignore = [
+    # quick-xml 0.39 inside opendal-core (pinned by iceberg-storage-opendal 0.10): it only
+    # parses S3 XML responses from our own RustFS, never user input. User-supplied XML (GPX)
+    # goes through quick-xml >= 0.42 in photolake-ingest.
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    # rsa: listed in Cargo.lock through sqlx's optional MySQL driver, which is not compiled
+    # (`cargo tree -i rsa` is empty). No fixed version exists upstream.
+    "RUSTSEC-2023-0071",
+]

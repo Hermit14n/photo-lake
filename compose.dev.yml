@@ -1,0 +1,5 @@
+# Native development: expose RustFS on localhost so `cargo run -- serve` and tests can reach it.
+services:
+  rustfs:
+    ports:
+      - "127.0.0.1:9000:9000"

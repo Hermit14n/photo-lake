@@ -1,0 +1,19 @@
+# systemd *user* service for a NATIVE (non-container) install: runs the UI, card watcher
+# and backup scheduler at login. The container setup (photolake-ctl) does not use this.
+# Installed by scripts/install.sh; PHOTOLAKE_DIR is substituted there.
+[Unit]
+Description=Photolake photo lakehouse (UI, card auto-import, backups)
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=PHOTOLAKE_DIR
+# Object storage container (no-op if already running).
+ExecStartPre=/usr/bin/docker compose -f PHOTOLAKE_DIR/docker-compose.yml -f PHOTOLAKE_DIR/compose.dev.yml up -d rustfs
+ExecStart=PHOTOLAKE_DIR/target/release/photolake serve
+Restart=on-failure
+RestartSec=5
+Environment=RUST_LOG=info,iceberg=warn,datafusion=warn,nom_exif=error,ort=warn
+
+[Install]
+WantedBy=default.target

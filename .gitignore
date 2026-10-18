@@ -1,0 +1,11 @@
+target/
+data/
+models/*.onnx
+models/*.npy
+models/cache/
+web/node_modules/
+web/dist/
+config.toml
+*.db
+tools/.venv/
+.ort/
