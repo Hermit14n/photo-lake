@@ -26,7 +26,7 @@ Docker (plus the NVIDIA GPU toolkit if you have an NVIDIA card) and runs everyth
 Your library lives in `~/Photolake`.
 
 ```bash
-curl -fsSL https://github.com/OWNER/photolake/releases/latest/download/install.sh -o install.sh
+curl -fsSL https://github.com/Hermit14n/photo-lake/releases/latest/download/install.sh -o install.sh
 bash install.sh
 ```
 

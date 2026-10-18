@@ -81,7 +81,7 @@ Sometimes a new version needs a new column, for example `photos.weather`.
    git tag v0.3.0 && git push origin v0.3.0
    ```
 4. GitHub Actions builds and publishes:
-   - `ghcr.io/<owner>/photolake:0.3.0`, `:0.3` and `:latest`
+   - `ghcr.io/Hermit14n/photolake:0.3.0`, `:0.3` and `:latest`
    - the matching `-cuda` images
    - a GitHub release with `install.sh`
 5. Users get it with `photolake-ctl update`.

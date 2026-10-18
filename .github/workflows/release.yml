@@ -1,6 +1,6 @@
 # Push a tag like v0.3.0 to publish:
-#   ghcr.io/<owner>/photolake:0.3.0, :0.3, :latest           (CPU)
-#   ghcr.io/<owner>/photolake:0.3.0-cuda, :0.3-cuda, :latest-cuda (NVIDIA GPU)
+#   ghcr.io/Hermit14n/photolake:0.3.0, :0.3, :latest           (CPU)
+#   ghcr.io/Hermit14n/photolake:0.3.0-cuda, :0.3-cuda, :latest-cuda (NVIDIA GPU)
 # and a GitHub release with install.sh (pre-set to this repository).
 # Bird models are published separately by models.yml.
 name: Release

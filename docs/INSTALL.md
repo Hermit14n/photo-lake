@@ -34,7 +34,7 @@ Press **Ctrl + Alt + T**, or search your app menu for "Terminal".
 Copy these two lines into the terminal and press Enter:
 
 ```bash
-curl -fsSL https://github.com/OWNER/photolake/releases/latest/download/install.sh -o install.sh
+curl -fsSL https://github.com/Hermit14n/photo-lake/releases/latest/download/install.sh -o install.sh
 bash install.sh
 ```
 
