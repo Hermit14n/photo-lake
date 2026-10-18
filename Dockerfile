@@ -59,7 +59,7 @@ LABEL org.opencontainers.image.title="Photolake" \
       org.opencontainers.image.description="Photo lakehouse with bird identification (CPU)" \
       org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
-FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04 AS runtime-cuda
+FROM nvidia/cuda:13.4.2-cudnn-runtime-ubuntu24.04 AS runtime-cuda
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates rclone tzdata \
  && rm -rf /var/lib/apt/lists/*
