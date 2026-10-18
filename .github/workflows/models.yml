@@ -29,7 +29,7 @@ jobs:
           echo "version=$(grep -o 'rtdetr_r50vd+bioclip2/[0-9]*' tools/export_models.py | head -1 | tr '+/' '--')" >> "$GITHUB_OUTPUT"
           # Image names must be lowercase; repository_owner keeps the account's capitals.
           echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/models.Dockerfile
