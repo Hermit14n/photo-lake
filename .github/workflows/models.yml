@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["tools/export_models.py", "docker/models.Dockerfile", "docker/install-models.sh"]
+    paths: ["tools/export_models.py", "docker/models.Dockerfile", "docker/install-models.sh", ".github/workflows/models.yml"]
 
 permissions:
   contents: read
@@ -25,12 +25,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Model version
         id: v
-        run: echo "version=$(grep -o 'rtdetr_r50vd+bioclip2/[0-9]*' tools/export_models.py | head -1 | tr '+/' '--')" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(grep -o 'rtdetr_r50vd+bioclip2/[0-9]*' tools/export_models.py | head -1 | tr '+/' '--')" >> "$GITHUB_OUTPUT"
+          # Image names must be lowercase; repository_owner keeps the account's capitals.
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/models.Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/photolake-models:latest
-            ghcr.io/${{ github.repository_owner }}/photolake-models:${{ steps.v.outputs.version }}
+            ghcr.io/${{ steps.v.outputs.owner }}/photolake-models:latest
+            ghcr.io/${{ steps.v.outputs.owner }}/photolake-models:${{ steps.v.outputs.version }}
