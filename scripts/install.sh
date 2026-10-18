@@ -46,8 +46,8 @@ ask() { # ask "Question" default(y/n)
 [ "$(id -u)" -ne 0 ] || die "Run this as your normal user (not with sudo); it asks for sudo when needed."
 SRC_DIR="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd || true)"
 IN_CHECKOUT=0; [ -f "$SRC_DIR/docker-compose.yml" ] && [ -d "$SRC_DIR/crates" ] && IN_CHECKOUT=1
-. /etc/os-release 2>/dev/null || true
-DISTRO="${ID:-unknown} ${ID_LIKE:-}"
+# Read os-release in a subshell: it defines VERSION, NAME, etc., which would clobber ours.
+DISTRO="$( . /etc/os-release 2>/dev/null; echo "${ID:-unknown} ${ID_LIKE:-}" )"
 
 bold "Photolake installer"
 info "Library folder: $HOME_DIR"

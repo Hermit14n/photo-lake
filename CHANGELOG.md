@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 (2026-10-18)
+
+### Fixed
+- Installer failed with `curl: (3) URL rejected` on distros whose `/etc/os-release` sets `VERSION`
+  (Linux Mint, Ubuntu and most others): it overwrote the installer's release version.
+- Bird-model image workflow used an uppercase owner in the image name, which ghcr.io rejects.
+
 ## 0.2.0 (2026-10-18)
 
 ### Added
