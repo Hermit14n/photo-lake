@@ -33,7 +33,7 @@ iceberg-catalog-sql = "0.10"
 iceberg-datafusion = "0.10"
 datafusion = "53.1"
 opendal = { version = "0.57", features = ["services-s3"] }
-sqlx = { version = "0.8", default-features = false, features = ["sqlite", "any", "runtime-tokio"] }
+sqlx = { version = "0.9", default-features = false, features = ["sqlite", "any", "runtime-tokio"] }
 rusty-s3 = "0.10"
 reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 directories = "6"
