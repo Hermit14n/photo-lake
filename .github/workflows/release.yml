@@ -55,7 +55,7 @@ jobs:
         run: |
           sed 's#^REPO="${PHOTOLAKE_REPO:-}"#REPO="${PHOTOLAKE_REPO:-${{ github.repository }}}"#' scripts/install.sh > install.sh
           grep -q '${{ github.repository }}' install.sh
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: install.sh
           generate_release_notes: true
