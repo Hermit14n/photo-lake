@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2 (2026-10-18)
+
+### Fixed
+- Remote access through Tailscale failed with "connection refused": the tailscale container's hostname
+  was `photolake`, so it proxied requests to itself instead of the app. The node name is now set with
+  `TS_HOSTNAME`; existing installs keep the same `https://photolake.<tailnet>.ts.net` address.
+
 ## 0.2.1 (2026-10-18)
 
 ### Fixed

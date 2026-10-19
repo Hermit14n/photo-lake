@@ -81,9 +81,10 @@ services:
   tailscale:
     profiles: [tailscale]
     image: tailscale/tailscale:v1.102.3
-    hostname: ${PHOTOLAKE_TS_HOSTNAME:-photolake}
     restart: ${PHOTOLAKE_RESTART:-unless-stopped}
     environment:
+      # Not `hostname:`: the container would resolve "photolake" to itself and proxy to nothing.
+      TS_HOSTNAME: ${PHOTOLAKE_TS_HOSTNAME:-photolake}
       TS_AUTHKEY: ${TS_AUTHKEY:-}
       TS_STATE_DIR: /var/lib/tailscale
       TS_USERSPACE: "true"
