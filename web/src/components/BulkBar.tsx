@@ -26,25 +26,30 @@ export function BulkBar({ ids, onDone, onSelectAll }: { ids: string[]; onDone: (
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 border-t border-line bg-s1 px-4 py-2.5">
-        <span className="mr-2 text-sm font-medium text-ink">{ids.length} selected</span>
-        <Button size="sm" variant="ghost" onClick={onSelectAll}>Select all loaded</Button>
-        <div className="mx-2 h-5 w-px bg-line" />
-        <Button size="sm" onClick={() => setDialog("tags")}><Tag size={13} /> Tags</Button>
-        <Button size="sm" onClick={() => setDialog("location")}><MapPin size={13} /> Location</Button>
-        <Button size="sm" onClick={() => setDialog("time")}><Clock size={13} /> Shift time</Button>
-        <Button size="sm" onClick={() => run({ edits: [{ field: "category", value: "bird" }] })}><Bird size={13} /> Mark bird</Button>
-        <Button size="sm" onClick={() => run({ edits: [{ field: "category", value: "general" }] })}><ImageIcon size={13} /> Mark general</Button>
-        <div className="flex items-center">
-          {[1, 2, 3, 4, 5].map((r) => (
-            <button key={r} title={`Rate ${r}`} onClick={() => run({ edits: [{ field: "rating", value: r }] })} className="p-1 text-muted hover:text-[#eda100]">
-              <Star size={15} />
-            </button>
-          ))}
+      {/* Phones: summary row on top, actions in one row that scrolls sideways. */}
+      <div className="flex flex-col gap-1.5 border-t border-line bg-s1 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:flex-row md:flex-wrap md:items-center md:gap-2 md:px-4 md:py-2.5">
+        <div className="flex items-center gap-2 md:contents">
+          <span className="mr-2 text-sm font-medium text-ink">{ids.length} selected</span>
+          <Button size="sm" variant="ghost" onClick={onSelectAll}>Select all loaded</Button>
+          {bulk.isPending && <span className="text-xs text-muted md:order-last">Saving…</span>}
+          {bulk.isError && <span className="truncate text-xs text-danger md:order-last">{String(bulk.error)}</span>}
+          <Button size="sm" variant="ghost" className="ml-auto md:order-last" onClick={onDone}><X size={14} /> Done</Button>
         </div>
-        {bulk.isPending && <span className="text-xs text-muted">Saving…</span>}
-        {bulk.isError && <span className="text-xs text-danger">{String(bulk.error)}</span>}
-        <Button size="sm" variant="ghost" className="ml-auto" onClick={onDone}><X size={14} /> Done</Button>
+        <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 md:contents">
+          <div className="mx-2 hidden h-5 w-px bg-line md:block" />
+          <Button size="sm" onClick={() => setDialog("tags")}><Tag size={13} /> Tags</Button>
+          <Button size="sm" onClick={() => setDialog("location")}><MapPin size={13} /> Location</Button>
+          <Button size="sm" onClick={() => setDialog("time")}><Clock size={13} /> Shift time</Button>
+          <Button size="sm" onClick={() => run({ edits: [{ field: "category", value: "bird" }] })}><Bird size={13} /> Mark bird</Button>
+          <Button size="sm" onClick={() => run({ edits: [{ field: "category", value: "general" }] })}><ImageIcon size={13} /> Mark general</Button>
+          <div className="flex shrink-0 items-center">
+            {[1, 2, 3, 4, 5].map((r) => (
+              <button key={r} title={`Rate ${r}`} onClick={() => run({ edits: [{ field: "rating", value: r }] })} className="p-1.5 text-muted hover:text-[#eda100] md:p-1">
+                <Star size={15} />
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <Modal open={dialog === "tags"} onClose={() => setDialog(null)} title={`Tags for ${ids.length} photos`}>

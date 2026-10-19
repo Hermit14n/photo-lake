@@ -34,6 +34,7 @@ export function PhotoDetail({ id, filters, onClose, onNavigate }: { id: string; 
   const [drawing, setDrawing] = useState(false);
   const [full, setFull] = useState(false);
   const [tab, setTab] = useState<"info" | "history">("info");
+  const swipe = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -61,20 +62,37 @@ export function PhotoDetail({ id, filters, onClose, onNavigate }: { id: string; 
   const nextBox = useMemo(() => (d ? Math.max(-1, ...d.birds.map((b) => b.box_index), ...d.candidates.map((c) => c.box_index)) + 1 : 0), [d]);
 
   return (
-    <div className="fixed inset-0 z-30 flex bg-bg/95 backdrop-blur-sm" role="dialog" aria-label="Photo detail">
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 px-4 py-2.5">
-          <Button variant="ghost" onClick={onClose}><X size={16} /> Close</Button>
+    <div className="fixed inset-0 z-30 flex flex-col overflow-y-auto bg-bg/95 pt-[env(safe-area-inset-top)] backdrop-blur-sm md:flex-row md:overflow-hidden md:pt-0" role="dialog" aria-label="Photo detail">
+      {/* Phones: photo on top, details scroll underneath. */}
+      <div className="relative flex h-[65dvh] min-w-0 shrink-0 flex-col md:h-auto md:flex-1 md:shrink">
+        <div className="flex items-center gap-1 px-2 py-2 md:gap-2 md:px-4 md:py-2.5">
+          <Button variant="ghost" onClick={onClose} aria-label="Close" className="px-2.5 md:px-3.5"><X size={16} /> <span className="hidden md:inline">Close</span></Button>
           <div className="min-w-0 flex-1 truncate text-sm text-ink2">
-            {p ? <><span className="text-ink">{p.title || p.original_filename}</span> · {fmtDate(p.captured_at, { dateStyle: "full", timeStyle: "short" })}</> : "…"}
+            {p ? <><span className="text-ink">{p.title || p.original_filename}</span><span className="hidden sm:inline"> · {fmtDate(p.captured_at, { dateStyle: "full", timeStyle: "short" })}</span></> : "…"}
             {pos >= 0 && <span className="ml-2 text-muted">{pos + 1} / {ids.data!.length}</span>}
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setShowBoxes((s) => !s)} title="Toggle bird boxes">{showBoxes ? <Eye size={15} /> : <EyeOff size={15} />} Boxes</Button>
-          {!readOnly && <Button variant={drawing ? "primary" : "ghost"} size="sm" onClick={() => setDrawing((v) => !v)} title="Draw a box around a bird the detector missed"><Square size={15} /> {drawing ? "Drag on the photo…" : "Add bird"}</Button>}
-          <Button variant="ghost" size="sm" onClick={() => setFull((f) => !f)} title="Load full resolution"><Maximize2 size={15} /> {full ? "Preview" : "Full res"}</Button>
-          <a href={img(id, "original")} className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-xs text-ink2 hover:bg-s2 hover:text-ink"><Download size={14} /> Original</a>
+          <Button variant="ghost" size="sm" onClick={() => setShowBoxes((s) => !s)} title="Toggle bird boxes">{showBoxes ? <Eye size={15} /> : <EyeOff size={15} />} <span className="hidden md:inline">Boxes</span></Button>
+          {!readOnly && <Button variant={drawing ? "primary" : "ghost"} size="sm" onClick={() => setDrawing((v) => !v)} title="Draw a box around a bird the detector missed"><Square size={15} /> <span className={clsx(!drawing && "hidden md:inline")}>{drawing ? "Drag on the photo…" : "Add bird"}</span></Button>}
+          <Button variant="ghost" size="sm" onClick={() => setFull((f) => !f)} title="Load full resolution"><Maximize2 size={15} /> <span className="hidden md:inline">{full ? "Preview" : "Full res"}</span></Button>
+          <a href={img(id, "original")} aria-label="Download original" className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-xs text-ink2 hover:bg-s2 hover:text-ink"><Download size={14} /> <span className="hidden md:inline">Original</span></a>
         </div>
-        <div className="relative flex min-h-0 flex-1 items-center justify-center px-14 pb-4">
+        <div
+          className="relative flex min-h-0 flex-1 touch-pan-y items-center justify-center px-2 pb-2 md:px-14 md:pb-4"
+          // Touch: swipe sideways for the previous/next photo.
+          onPointerDown={(e) => {
+            if (e.pointerType === "touch" && !drawing) swipe.current = { x: e.clientX, y: e.clientY };
+          }}
+          onPointerUp={(e) => {
+            const st = swipe.current;
+            swipe.current = null;
+            if (!st) return;
+            const dx = e.clientX - st.x;
+            if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(e.clientY - st.y) * 1.5) return;
+            if (dx > 0 && prev) onNavigate(prev);
+            else if (dx < 0 && next) onNavigate(next);
+          }}
+          onPointerCancel={() => (swipe.current = null)}
+        >
           {prev && <NavButton side="left" onClick={() => onNavigate(prev)} />}
           {next && <NavButton side="right" onClick={() => onNavigate(next)} />}
           {d ? (
@@ -94,7 +112,7 @@ export function PhotoDetail({ id, filters, onClose, onNavigate }: { id: string; 
         </div>
       </div>
 
-      <aside className="flex w-[400px] shrink-0 flex-col border-l border-line bg-s1">
+      <aside className="flex w-full shrink-0 flex-col border-t border-line bg-s1 pb-[env(safe-area-inset-bottom)] md:w-[400px] md:border-t-0 md:border-l md:pb-0">
         <div className="flex border-b border-line px-2">
           {(["info", "history"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={clsx("flex items-center gap-1.5 border-b-2 px-3 py-3 text-sm", tab === t ? "border-accent text-ink" : "border-transparent text-ink2 hover:text-ink")}>
@@ -103,7 +121,7 @@ export function PhotoDetail({ id, filters, onClose, onNavigate }: { id: string; 
           ))}
           <div className="ml-auto flex items-center pr-2 text-xs text-muted">{save.isPending ? "Saving…" : save.isError ? <span className="text-danger">{String(save.error)}</span> : save.isSuccess ? "Saved to lake" : ""}</div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 p-4 md:overflow-y-auto">
           {/* A disabled fieldset turns every editor inside into read-only controls for viewers. */}
           <fieldset disabled={readOnly} className="min-w-0">
             {!d ? <Spinner /> : tab === "info" ? <InfoPanel d={d} edit={edit} /> : <HistoryPanel d={d} />}
@@ -116,7 +134,7 @@ export function PhotoDetail({ id, filters, onClose, onNavigate }: { id: string; 
 
 function NavButton({ side, onClick }: { side: "left" | "right"; onClick: () => void }) {
   return (
-    <button onClick={onClick} aria-label={side === "left" ? "Previous photo" : "Next photo"} className={clsx("absolute top-1/2 z-10 -translate-y-1/2 rounded-full bg-s2/80 p-2 text-ink hover:bg-s3", side === "left" ? "left-2" : "right-2")}>
+    <button onClick={onClick} aria-label={side === "left" ? "Previous photo" : "Next photo"} className={clsx("absolute top-1/2 z-10 hidden -translate-y-1/2 rounded-full md:block bg-s2/80 p-2 text-ink hover:bg-s3", side === "left" ? "left-2" : "right-2")}>
       {side === "left" ? <ChevronLeft size={22} /> : <ChevronRight size={22} />}
     </button>
   );
@@ -134,7 +152,7 @@ function ImageWithBoxes({ src, birds, drawing, onDrawn }: { src: string; birds: 
   return (
     <div
       ref={ref}
-      className={clsx("relative max-h-full max-w-full", drawing && "cursor-crosshair")}
+      className={clsx("relative max-h-full max-w-full", drawing && "cursor-crosshair touch-none")}
       onPointerDown={(e) => {
         if (!drawing) return;
         const p = rel(e);
@@ -147,7 +165,7 @@ function ImageWithBoxes({ src, birds, drawing, onDrawn }: { src: string; birds: 
         setDrag(null);
       }}
     >
-      <img src={src} alt="" draggable={false} onLoad={() => setLoaded(true)} className="block max-h-[calc(100vh-80px)] max-w-full select-none rounded-lg object-contain" />
+      <img src={src} alt="" draggable={false} onLoad={() => setLoaded(true)} className="block max-h-[calc(65dvh-60px)] max-w-full select-none rounded-lg object-contain md:max-h-[calc(100vh-80px)]" />
       {!loaded && <div className="absolute inset-0 flex items-center justify-center"><Spinner /></div>}
       {loaded &&
         birds.map((b) => {

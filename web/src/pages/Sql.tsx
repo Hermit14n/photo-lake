@@ -18,7 +18,7 @@ export function Sql() {
   const [q, setQ] = useState(EXAMPLES[0][1]);
   const run = useMutation({ mutationFn: (query: string) => api.post<Result>("/sql", { query }) });
   return (
-    <div className="h-full overflow-auto p-6">
+    <div className="h-full overflow-auto p-3 md:p-6">
       <div className="mx-auto max-w-6xl space-y-4">
         <Card title="Query the lakehouse" action={<span className="text-xs text-muted">Read-only · DataFusion SQL · tables: photos_mem, birds_mem, lake.photolake.*</span>}>
           <div className="mb-2 flex flex-wrap gap-1.5">

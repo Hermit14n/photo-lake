@@ -36,7 +36,7 @@ export function Settings() {
   const s = settings.data;
 
   return (
-    <div className="h-full overflow-auto p-6">
+    <div className="h-full overflow-auto p-3 md:p-6">
       <div className="mx-auto max-w-4xl space-y-4">
         {save.data?.restart_required && <div className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2.5 text-sm text-ink">Saved. Restart Photolake for model/time-zone changes to take effect.</div>}
         {save.isError && <div className="rounded-lg border border-danger/50 px-4 py-2.5 text-sm text-danger">{String(save.error)}</div>}
@@ -89,9 +89,9 @@ export function Settings() {
             <Toggle label="Detect and identify birds" checked={s.ml.enabled} onChange={(v) => save.mutate({ ml_enabled: v })} />
             <TextSetting label="eBird API key" password hint={<>Optional, free at <a className="text-focus underline" href="https://ebird.org/api/keygen" target="_blank" rel="noreferrer">ebird.org/api/keygen</a>. Ranks species by what's actually seen near the photo, like Merlin does. {s.ml.has_ebird_key && <b className="text-[#0ca30c]">Key saved.</b>}</>} value="" placeholder={s.ml.has_ebird_key ? "•••••••• (saved; type to replace)" : "paste key"} onSave={(v) => save.mutate({ ebird_api_key: v })} />
             <TextSetting label="Home region" hint="eBird region used for photos without GPS (your camera has none), e.g. US-CO, US-CO-031, GB-ENG." value={s.ml.home_region ?? ""} placeholder="US-CO" onSave={(v) => save.mutate({ home_region: v })} />
-            <div className="flex items-center gap-3">
-              <span className="w-44 text-ink2">Detection threshold</span>
-              <input type="range" min={0.1} max={0.9} step={0.05} defaultValue={s.ml.detection_threshold} onMouseUp={(e) => save.mutate({ detection_threshold: Number((e.target as HTMLInputElement).value) })} className="w-48 accent-[var(--accent)]" />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="w-full text-ink2 sm:w-44">Detection threshold</span>
+              <input type="range" min={0.1} max={0.9} step={0.05} defaultValue={s.ml.detection_threshold} onPointerUp={(e) => save.mutate({ detection_threshold: Number((e.target as HTMLInputElement).value) })} className="w-48 accent-[var(--accent)]" />
               <span className="tabular-nums text-ink">{s.ml.detection_threshold.toFixed(2)}</span>
               <span className="text-xs text-muted">lower finds more birds, with more false alarms</span>
             </div>
@@ -102,7 +102,7 @@ export function Settings() {
 
         <Card title="System">
           {!status.data ? <Spinner /> : (
-            <dl className="grid grid-cols-[180px_1fr] gap-y-1.5 text-sm">
+            <dl className="grid grid-cols-1 gap-y-1.5 text-sm sm:grid-cols-[180px_1fr]">
               {[...Object.entries(status.data), ["config_file", s.config_path ?? "—"], ["rclone", backup.data?.rclone ?? "not installed (needed only for cloud targets)"]].map(([k, v]) => (
                 <Fragment key={String(k)}><dt className="text-ink2">{String(k).replace(/_/g, " ")}</dt><dd className="truncate text-ink">{String(v)}</dd></Fragment>
               ))}
@@ -129,8 +129,8 @@ function TextSetting({ label, hint, value, placeholder, password, onSave }: { la
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   return (
-    <div className="flex items-start gap-3">
-      <span className="w-44 shrink-0 pt-2 text-ink2">{label}</span>
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
+      <span className="shrink-0 text-ink2 sm:w-44 sm:pt-2">{label}</span>
       <div className="flex-1">
         <div className="flex gap-2">
           <Input type={password ? "password" : "text"} value={v} placeholder={placeholder} onChange={(e) => setV(e.target.value)} className="max-w-sm" />

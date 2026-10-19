@@ -1,5 +1,7 @@
+import * as Dialog from "@radix-ui/react-dialog";
 import { useQuery } from "@tanstack/react-query";
-import { Bird, Image as ImageIcon, Images, RotateCcw } from "lucide-react";
+import { Bird, Image as ImageIcon, Images, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import { useState } from "react";
 import { api, toQuery, type Facets, type Filters } from "../lib/api";
 import { Button, Combobox, SearchInput, Segmented, Select } from "./ui";
 
@@ -34,23 +36,17 @@ export function FilterBar({
   const tags = useFacets(without("tag")).data?.tags ?? [];
   const years = useFacets(without("year")).data?.years ?? [];
 
+  const [sheet, setSheet] = useState(false);
   const active = Object.entries(filters).some(([k, v]) => k !== "sort" && v);
+  // Filters hidden behind the phone sheet (category and search stay visible).
+  const inSheet = Object.entries(filters).filter(([k, v]) => !["sort", "category", "q"].includes(k) && v).length;
   const cat = (filters.category ?? "all") as "all" | "bird" | "general";
   const flags = filters.undated === "true" ? "undated" : filters.has_location === "false" ? "no_location" : filters.edited === "true" ? "edited" : undefined;
   const opt = (xs: { value: string | number; n: number; label?: string }[]) =>
     xs.map((x) => ({ value: String(x.value), label: x.label ?? String(x.value), count: x.n }));
 
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Segmented
-        value={cat}
-        onChange={(v) => onChange({ category: v === "all" ? undefined : v })}
-        options={[
-          { value: "all", label: <><Images size={14} /> All</> },
-          { value: "bird", label: <><Bird size={14} /> Birds</> },
-          { value: "general", label: <><ImageIcon size={14} /> General</> },
-        ]}
-      />
+  const dropdowns = (
+    <>
       <Combobox
         value={filters.species}
         valueLabel={species.find((s) => s.value === filters.species)?.label}
@@ -106,17 +102,62 @@ export function FilterBar({
           ]}
         />
       )}
+    </>
+  );
+  const clear = active && (
+    <Button
+      variant="ghost"
+      onClick={() =>
+        onChange(Object.fromEntries(Object.keys(filters).filter((k) => k !== "sort").map((k) => [k, undefined])) as Partial<Filters>)
+      }
+    >
+      <RotateCcw size={14} /> Clear
+    </Button>
+  );
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Segmented
+        value={cat}
+        onChange={(v) => onChange({ category: v === "all" ? undefined : v })}
+        options={[
+          { value: "all", label: <><Images size={14} /> All</> },
+          { value: "bird", label: <><Bird size={14} /> Birds</> },
+          { value: "general", label: <><ImageIcon size={14} /> General</> },
+        ]}
+      />
+      <Dialog.Root open={sheet} onOpenChange={setSheet}>
+        <Dialog.Trigger asChild>
+          <Button className="ml-auto md:hidden" aria-label="Filters">
+            <SlidersHorizontal size={14} /> Filters
+            {inSheet > 0 && <span className="rounded-full bg-accent px-1.5 text-[11px] leading-4 text-white">{inSheet}</span>}
+          </Button>
+        </Dialog.Trigger>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 md:hidden" />
+          <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t border-line bg-s1 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl md:hidden">
+            <div className="mb-3 flex items-center justify-between">
+              <Dialog.Title className="text-base font-semibold text-ink">Filters</Dialog.Title>
+              <Dialog.Close className="rounded-lg p-1.5 text-ink2 hover:bg-s2" aria-label="Close"><X size={18} /></Dialog.Close>
+            </div>
+            <Dialog.Description className="sr-only">Narrow down the photos shown</Dialog.Description>
+            <div className="grid grid-cols-1 gap-2 [&>*]:w-full">
+              {dropdowns}
+            </div>
+            <div className="mt-4 flex gap-2">
+              {clear}
+              <Button variant="primary" className="ml-auto" onClick={() => setSheet(false)}>Done</Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+      <div className="hidden md:contents">
+        {dropdowns}
+      </div>
       <SearchInput value={filters.q ?? ""} onChange={(q) => onChange({ q: q || undefined })} placeholder="Search notes, species, places…" />
-      {active && (
-        <Button
-          variant="ghost"
-          onClick={() =>
-            onChange(Object.fromEntries(Object.keys(filters).filter((k) => k !== "sort").map((k) => [k, undefined])) as Partial<Filters>)
-          }
-        >
-          <RotateCcw size={14} /> Clear
-        </Button>
-      )}
+      <div className="hidden md:contents">
+        {clear}
+      </div>
       {extra}
     </div>
   );

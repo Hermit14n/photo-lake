@@ -90,7 +90,7 @@ export function MapPage({ route, filters }: { route: Route; filters: Filters }) 
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-line px-4 py-3">
+      <div className="border-b border-line px-3 py-2.5 md:px-4 md:py-3">
         <FilterBar filters={filters} onChange={(c) => { fitted.current = false; setParams(route, c); }} extra={<span className="ml-auto text-sm text-ink2">{q.data ? `${q.data.length.toLocaleString()} located photos` : ""}</span>} />
       </div>
       <div className="relative flex-1">

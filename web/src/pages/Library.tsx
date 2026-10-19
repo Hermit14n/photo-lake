@@ -12,6 +12,10 @@ import { setParams, type Route } from "../lib/route";
 const PAGE = 400;
 const GAP = 6;
 const SIZES = { s: 140, m: 200, l: 300 } as const;
+// Narrow screens (phones) pick a column count instead, so "M" isn't one giant tile per row.
+const NARROW = 640;
+const NARROW_COLS = { s: 4, m: 3, l: 2 } as const;
+const LONG_PRESS_MS = 450;
 
 type Row = { kind: "header"; day: string; count: number; birds: number; ids: string[] } | { kind: "tiles"; items: PhotoSummary[] };
 
@@ -32,7 +36,7 @@ export function Library({ route, filters }: { route: Route; filters: Filters }) 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth - 32));
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth - (el.clientWidth < NARROW ? 16 : 32)));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -51,7 +55,7 @@ export function Library({ route, filters }: { route: Route; filters: Filters }) 
   const items = useMemo(() => q.data?.pages.flatMap((p) => p.items) ?? [], [q.data]);
   const total = q.data?.pages[0]?.total ?? 0;
   const tile = SIZES[size];
-  const perRow = Math.max(1, Math.floor((width + GAP) / (tile + GAP)));
+  const perRow = width < NARROW ? NARROW_COLS[size] : Math.max(1, Math.floor((width + GAP) / (tile + GAP)));
   const tileW = (width - GAP * (perRow - 1)) / perRow;
 
   const rows = useMemo(() => {
@@ -105,7 +109,7 @@ export function Library({ route, filters }: { route: Route; filters: Filters }) 
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-line bg-bg px-4 py-3">
+      <div className="border-b border-line bg-bg px-3 py-2.5 md:px-4 md:py-3">
         <FilterBar
           filters={filters}
           onChange={(c) => setParams(route, c)}
@@ -129,7 +133,7 @@ export function Library({ route, filters }: { route: Route; filters: Filters }) 
           }
         />
       </div>
-      <div ref={scrollRef} className="relative flex-1 overflow-auto px-4">
+      <div ref={scrollRef} className="relative flex-1 overflow-auto px-2 sm:px-4">
         {q.isLoading && (
           <div className="flex justify-center py-24">
             <Spinner />
@@ -147,20 +151,20 @@ export function Library({ route, filters }: { route: Route; filters: Filters }) 
             return (
               <div key={v.key} style={{ position: "absolute", top: 0, left: 0, right: 0, transform: `translateY(${v.start}px)` }}>
                 {row.kind === "header" ? (
-                  <div className="flex h-12 items-end gap-3 pb-2">
+                  <div className="flex h-12 items-end gap-x-3 overflow-hidden pb-2">
                     <button
-                      className="text-base font-semibold text-ink hover:text-accent"
+                      className="truncate text-sm font-semibold text-ink hover:text-accent sm:text-base"
                       title="Show only this day"
                       onClick={() => row.day !== "undated" && setParams(route, { from: row.day, to: row.day, year: undefined, month: undefined })}
                     >
                       {dayLabel(row.day)}
                     </button>
-                    <span className="text-xs text-muted">
+                    <span className="shrink-0 text-xs text-muted">
                       {row.count} photo{row.count === 1 ? "" : "s"}
                       {row.birds > 0 && ` · ${row.birds} with birds`}
                     </span>
                     {selected.size > 0 && (
-                      <button className="text-xs text-focus hover:underline" onClick={() => setSelected((s) => new Set([...s, ...row.ids]))}>
+                      <button className="shrink-0 text-xs text-focus hover:underline" onClick={() => setSelected((s) => new Set([...s, ...row.ids]))}>
                         Select day
                       </button>
                     )}
@@ -168,7 +172,7 @@ export function Library({ route, filters }: { route: Route; filters: Filters }) 
                 ) : (
                   <div className="flex" style={{ gap: GAP, paddingBottom: GAP }}>
                     {row.items.map((p) => (
-                      <Tile key={p.photo_id} p={p} size={tileW} selected={selected.has(p.photo_id)} selecting={selected.size > 0} onClick={click} onToggle={toggle} />
+                      <Tile key={p.photo_id} p={p} size={tileW} selected={selected.has(p.photo_id)} selecting={selected.size > 0} onClick={click} onToggle={toggle} onLongPress={() => !readOnly && toggle(p.photo_id)} />
                     ))}
                   </div>
                 )}
@@ -194,6 +198,7 @@ function Tile({
   selecting,
   onClick,
   onToggle,
+  onLongPress,
 }: {
   p: PhotoSummary;
   size: number;
@@ -201,21 +206,48 @@ function Tile({
   selecting: boolean;
   onClick: (p: PhotoSummary, e: React.MouseEvent) => void;
   onToggle: (id: string) => void;
+  onLongPress: () => void;
 }) {
+  // Touch: press and hold to start selecting (there is no hover to reveal the checkbox).
+  const press = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number; fired: boolean } | null>(null);
+  const cancel = () => press.current && clearTimeout(press.current.timer);
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={(e) => onClick(p, e)}
+      onPointerDown={(e) => {
+        if (e.pointerType !== "touch") return;
+        cancel();
+        const st = { x: e.clientX, y: e.clientY, fired: false, timer: setTimeout(() => {
+          st.fired = true;
+          navigator.vibrate?.(15);
+          onLongPress();
+        }, LONG_PRESS_MS) };
+        press.current = st;
+      }}
+      onPointerMove={(e) => {
+        const st = press.current;
+        if (st && Math.hypot(e.clientX - st.x, e.clientY - st.y) > 10) cancel();
+      }}
+      onPointerUp={cancel}
+      onPointerCancel={cancel}
+      onContextMenu={(e) => press.current?.fired && e.preventDefault()}
+      onClick={(e) => {
+        if (press.current?.fired) {
+          press.current = null;
+          return;
+        }
+        onClick(p, e);
+      }}
       onKeyDown={(e) => e.key === "Enter" && onClick(p, e as unknown as React.MouseEvent)}
       title={`${p.original_filename} · ${fmtDate(p.captured_at)}`}
       className={clsx(
-        "group relative cursor-pointer overflow-hidden rounded-lg bg-s2",
+        "group relative cursor-pointer select-none overflow-hidden rounded-lg bg-s2 [-webkit-touch-callout:none]",
         selected && "ring-2 ring-accent ring-offset-2 ring-offset-bg",
       )}
       style={{ width: size, height: size }}
     >
-      <img src={img(p.photo_id, "thumb")} loading="lazy" decoding="async" alt={p.species ?? p.original_filename} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+      <img src={img(p.photo_id, "thumb")} loading="lazy" decoding="async" alt={p.species ?? p.original_filename} draggable={false} className="h-full w-full select-none object-cover transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]" />
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -225,7 +257,7 @@ function Tile({
         className={clsx(
           "absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-opacity",
           selected ? "border-accent bg-accent text-white opacity-100" : "border-white/80 bg-black/30 text-transparent",
-          selecting || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+          selecting || selected ? "opacity-100" : "opacity-0 [@media(hover:hover)]:group-hover:opacity-100",
         )}
       >
         <Check size={14} strokeWidth={3} />

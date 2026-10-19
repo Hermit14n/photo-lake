@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { BarChart3, Bird, Database, FolderInput, Images, LogOut, Map as MapIcon, Moon, Settings as SettingsIcon, Sun } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { BarChart3, Bird, Database, FolderInput, Images, LogOut, Map as MapIcon, Menu, Moon, Settings as SettingsIcon, Sun } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { PhotoDetail } from "./components/PhotoDetail";
 import { api, RoleContext, UNAUTHORIZED_EVENT, type Me } from "./lib/api";
@@ -123,46 +124,53 @@ function Shell({ role, authRequired }: { role: "admin" | "viewer"; authRequired:
     } else navigate(page);
   };
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const nav = (
+    <NavContent
+      role={role}
+      authRequired={authRequired}
+      current={route.page}
+      live={live}
+      isDark={isDark}
+      onToggleTheme={toggle}
+      onGo={(page) => {
+        setMenuOpen(false);
+        go(page);
+      }}
+      onSignOut={async () => {
+        await api.post("/auth/logout", {});
+        qc.resetQueries();
+      }}
+    />
+  );
+
   return (
-    <div className="flex h-full">
-      <nav className="flex w-56 shrink-0 flex-col border-r border-line bg-s1">
-        <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white"><Bird size={18} /></div>
-          <div>
-            <div className="text-[15px] font-semibold leading-tight text-ink">Photolake</div>
-            <div className="text-[11px] text-muted">Iceberg photo lakehouse</div>
-          </div>
-        </div>
-        <div className="flex-1 space-y-0.5 px-2">
-          {NAV.filter((n) => role === "admin" || !n.admin).map((n) => (
-            <button key={n.page} onClick={() => go(n.page)} className={clsx("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm", route.page === n.page ? "bg-s3 font-medium text-ink" : "text-ink2 hover:bg-s2 hover:text-ink")}>
-              {n.icon} {n.label}
-            </button>
-          ))}
-        </div>
-        {live?.running && route.page !== "imports" && (
-          <button className="mx-3 mb-3 rounded-lg border border-line bg-s2 p-2.5 text-left" onClick={() => navigate("imports")}>
-            <LiveProgress live={live} compact />
-          </button>
-        )}
-        <div className="border-t border-line p-3">
-          <button onClick={toggle} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink2 hover:bg-s2 hover:text-ink">
-            {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? "Light mode" : "Dark mode"}
-          </button>
-          {authRequired && (
-            <button
-              onClick={async () => {
-                await api.post("/auth/logout", {});
-                qc.resetQueries();
-              }}
-              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink2 hover:bg-s2 hover:text-ink"
-            >
-              <LogOut size={16} /> Sign out{role === "viewer" ? " (viewer)" : ""}
+    <div className="flex h-dvh flex-col md:flex-row">
+      <nav className="hidden w-56 shrink-0 flex-col border-r border-line bg-s1 md:flex">{nav}</nav>
+      {/* Phones: a slim top bar; the same navigation opens as a drawer. */}
+      <Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}>
+        <header className="flex shrink-0 items-center gap-2 border-b border-line bg-s1 px-2 pb-1.5 pt-[max(0.375rem,env(safe-area-inset-top))] md:hidden">
+          <Dialog.Trigger className="rounded-lg p-2 text-ink2 hover:bg-s2 hover:text-ink" aria-label="Menu">
+            <Menu size={20} />
+          </Dialog.Trigger>
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-white"><Bird size={16} /></div>
+          <div className="text-[15px] font-semibold text-ink">{NAV.find((n) => n.page === route.page)?.label ?? "Photolake"}</div>
+          {live?.running && route.page !== "imports" && (
+            <button className="ml-auto truncate pr-2 text-xs text-ink2" onClick={() => navigate("imports")}>
+              Importing {live.done}/{live.total}
             </button>
           )}
-        </div>
-      </nav>
-      <main className="min-w-0 flex-1">
+        </header>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 md:hidden" />
+          <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-64 max-w-[85vw] flex-col border-r border-line bg-s1 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl md:hidden">
+            <Dialog.Title className="sr-only">Navigation</Dialog.Title>
+            <Dialog.Description className="sr-only">Pages and account</Dialog.Description>
+            {nav}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+      <main className="min-h-0 min-w-0 flex-1">
         {route.page === "library" && <Library route={route} filters={filters} />}
         {route.page === "map" && <MapPage route={route} filters={filters} />}
         {route.page === "analytics" && <Analytics route={route} filters={filters} />}
@@ -179,5 +187,59 @@ function Shell({ role, authRequired }: { role: "admin" | "viewer"; authRequired:
         />
       )}
     </div>
+  );
+}
+
+function NavContent({
+  role,
+  authRequired,
+  current,
+  live,
+  isDark,
+  onToggleTheme,
+  onGo,
+  onSignOut,
+}: {
+  role: "admin" | "viewer";
+  authRequired: boolean;
+  current: Page;
+  live: LiveImport | null;
+  isDark: boolean;
+  onToggleTheme: () => void;
+  onGo: (page: Page) => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2 px-5 py-5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white"><Bird size={18} /></div>
+        <div>
+          <div className="text-[15px] font-semibold leading-tight text-ink">Photolake</div>
+          <div className="text-[11px] text-muted">Iceberg photo lakehouse</div>
+        </div>
+      </div>
+      <div className="flex-1 space-y-0.5 overflow-y-auto px-2">
+        {NAV.filter((n) => role === "admin" || !n.admin).map((n) => (
+          <button key={n.page} onClick={() => onGo(n.page)} className={clsx("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm md:py-2", current === n.page ? "bg-s3 font-medium text-ink" : "text-ink2 hover:bg-s2 hover:text-ink")}>
+            {n.icon} {n.label}
+          </button>
+        ))}
+      </div>
+      {live?.running && current !== "imports" && (
+        <button className="mx-3 mb-3 rounded-lg border border-line bg-s2 p-2.5 text-left" onClick={() => onGo("imports")}>
+          <LiveProgress live={live} compact />
+        </button>
+      )}
+      <div className="border-t border-line p-3">
+        <button onClick={onToggleTheme} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink2 hover:bg-s2 hover:text-ink">
+          {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? "Light mode" : "Dark mode"}
+        </button>
+        {authRequired && (
+          <button onClick={onSignOut} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink2 hover:bg-s2 hover:text-ink">
+            <LogOut size={16} /> Sign out{role === "viewer" ? " (viewer)" : ""}
+          </button>
+        )}
+      </div>
+    </>
   );
 }

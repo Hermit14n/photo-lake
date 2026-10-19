@@ -15,7 +15,7 @@ export function Imports({ live }: { live: LiveImport | null }) {
   const start = useMutation({ mutationFn: (p: string) => api.post("/imports", { path: p }), onSuccess: () => qc.invalidateQueries({ queryKey: ["batches"] }) });
 
   return (
-    <div className="h-full overflow-auto p-6">
+    <div className="h-full overflow-auto p-3 md:p-6">
       <div className="mx-auto max-w-4xl space-y-4">
         <Card title="Import">
           <p className="mb-3 text-sm text-ink2">
@@ -33,7 +33,8 @@ export function Imports({ live }: { live: LiveImport | null }) {
 
         <Card title="History">
           {batches.isLoading ? <Spinner /> : !batches.data?.length ? <p className="text-sm text-ink2">No imports yet.</p> : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full whitespace-nowrap text-sm">
               <thead><tr className="text-left text-xs text-muted"><th className="py-2 font-medium">When</th><th className="font-medium">Source</th><th className="text-right font-medium">Imported</th><th className="text-right font-medium">Birds</th><th className="text-right font-medium">Skipped</th><th className="text-right font-medium">Errors</th></tr></thead>
               <tbody>
                 {batches.data.map((b) => (
@@ -48,6 +49,7 @@ export function Imports({ live }: { live: LiveImport | null }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </Card>
       </div>

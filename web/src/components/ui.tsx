@@ -53,7 +53,7 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
       ref={ref}
       {...rest}
       className={clsx(
-        "h-9 w-full rounded-lg border border-line bg-s2 px-3 text-sm text-ink placeholder:text-muted outline-none focus:border-focus",
+        "h-9 w-full rounded-lg border border-line bg-s2 px-3 text-base text-ink placeholder:text-muted outline-none focus:border-focus md:text-sm",
         className,
       )}
     />
@@ -69,9 +69,9 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
     return () => clearTimeout(t);
   }, [local]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="relative">
+    <div className="relative w-full md:w-auto">
       <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
-      <Input value={local} onChange={(e) => setLocal(e.target.value)} placeholder={placeholder} className="pl-8 w-56" />
+      <Input value={local} onChange={(e) => setLocal(e.target.value)} placeholder={placeholder} className="pl-8 md:w-56" />
     </div>
   );
 }
@@ -103,7 +103,7 @@ export function Select({
       <RSelect.Trigger
         aria-label={label ?? placeholder}
         className={clsx(
-          "inline-flex h-9 min-w-28 items-center justify-between gap-2 rounded-lg border px-3 text-sm outline-none",
+          "inline-flex h-9 min-w-28 items-center justify-between gap-2 rounded-lg border px-3 text-base outline-none md:text-sm",
           value ? "border-accent/60 bg-s2 text-ink" : "border-line bg-s2 text-ink2 hover:text-ink",
           className,
         )}
@@ -114,7 +114,7 @@ export function Select({
         <ChevronDown size={14} className="shrink-0 text-muted" />
       </RSelect.Trigger>
       <RSelect.Portal>
-        <RSelect.Content position="popper" sideOffset={4} className="z-50 max-h-80 min-w-48 overflow-hidden rounded-lg border border-line bg-s1 shadow-xl">
+        <RSelect.Content position="popper" sideOffset={4} className="z-50 max-h-80 min-w-48 max-w-[calc(100vw-16px)] overflow-hidden rounded-lg border border-line bg-s1 shadow-xl">
           <RSelect.Viewport className="p-1">
             {allowAny && <Item value={ANY} label={`Any ${placeholder.toLowerCase()}`} />}
             {options.map((o) => (
@@ -187,7 +187,7 @@ export function Combobox({
         {trigger ?? (
           <button
             className={clsx(
-              "inline-flex h-9 min-w-36 items-center justify-between gap-2 rounded-lg border px-3 text-sm",
+              "inline-flex h-9 min-w-36 items-center justify-between gap-2 rounded-lg border px-3 text-base md:text-sm",
               value ? "border-accent/60 bg-s2 text-ink" : "border-line bg-s2 text-ink2 hover:text-ink",
             )}
           >
@@ -197,7 +197,7 @@ export function Combobox({
         )}
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content sideOffset={4} align="start" className="z-50 w-80 rounded-lg border border-line bg-s1 p-1 shadow-xl">
+        <Popover.Content sideOffset={4} align="start" className="z-50 w-80 max-w-[calc(100vw-16px)] rounded-lg border border-line bg-s1 p-1 shadow-xl">
           <Input
             autoFocus
             value={q}
